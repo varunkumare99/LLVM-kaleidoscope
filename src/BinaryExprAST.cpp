@@ -16,6 +16,8 @@ Value *BinaryExprAST::codegen() {
 			return Codegen::Builder->CreateFSub(L, R, "subtmp");
 		case '*':
 			return Codegen::Builder->CreateFMul(L, R, "multmp");
+		case '/':
+			return Codegen::Builder->CreateFDiv(L, R, "divtmp");
 		case '<':
 			L = Codegen::Builder->CreateFCmpULT(L, R, "cmptmp");
 			//convert 0 or 1 to double 0.0 or 1.0 since our language understands only doubles

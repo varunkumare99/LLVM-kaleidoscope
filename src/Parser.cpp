@@ -6,7 +6,7 @@
 #include <memory>
 #include "Codegen.h"
 
-std::map<char, int> Parser::BinopPrecendence = { {'<', 10}, {'+', 20}, {'-', 20}, {'*', 40}};
+std::map<char, int> Parser::BinopPrecendence = { {'<', 10}, {'+', 20}, {'-', 20}, {'*', 40}, {'/', 50}};
 
 Parser::Parser(Lexer lex, int tok) : CurTok(tok), lexer(lex) {}
 
