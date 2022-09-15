@@ -3,11 +3,24 @@
 #include "llvm/IR/Verifier.h"
 
 FunctionAST::FunctionAST(std::unique_ptr<PrototypeAST> Proto, std::unique_ptr<ExprAST> Body)
-    :Proto(std::move(Proto)), Body(std::move(Body)) {}
+	:Proto(std::move(Proto)), Body(std::move(Body)) {
+	}
 
 Function *FunctionAST::codegen() {
 	//First, check for an existing function with same name from previous extern declarations
 	Function *TheFunction = Codegen::TheModule->getFunction(Proto->getName());
+
+	if (TheFunction) {
+		if (TheFunction->arg_size() != Proto->getArgs().size())
+			TheFunction = nullptr;
+
+		if (TheFunction) {
+			int i = 0;
+			for (auto itr = TheFunction->arg_begin(); itr != TheFunction->arg_end() ; ++itr, ++i) {
+				itr->setName(Proto->getArgs()[i]);
+			}
+		}
+	}
 
 	//if not previous defined, first generate LLVM IR for prototype then proceed towards the body of the function
 	if (!TheFunction)

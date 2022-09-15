@@ -1,11 +1,16 @@
 #include "PrototypeAST.h"
 #include "Codegen.h"
+#include <vector>
 
 PrototypeAST::PrototypeAST(const std::string& Name, std::vector<std::string> Args)
     :Name(Name), Args(std::move(Args)) {}
 
 const std::string& PrototypeAST::getName() const {
     return Name;
+}
+
+const std::vector<std::string>& PrototypeAST::getArgs() const {
+	return Args;
 }
 
 Function *PrototypeAST::codegen() {
