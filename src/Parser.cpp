@@ -3,6 +3,7 @@
 #include "NumberExprAST.h"
 #include "VariableExprAST.h"
 #include "CallExprAST.h"
+#include "JitOptimizer.h"
 #include <memory>
 #include "Codegen.h"
 
@@ -77,7 +78,7 @@ std::unique_ptr<ExprAST> Parser::ParseIdentifierExpr() {
 
 	//eat token ')'
 	getNextToken();
-
+	
 	return std::make_unique<CallExprAST>(IdName, std::move(Args));
 }
 
@@ -187,12 +188,11 @@ std::unique_ptr<PrototypeAST> Parser::ParseExtern() {
 	getNextToken(); //eat extern
 	return ParsePrototype();
 }
-
 //toplevelexpr := expression
 std::unique_ptr<FunctionAST> Parser::ParseTopLevelExpr() {
 	if (auto E = ParseExpression()) {
 		//Make a anonymous Proto
-		auto Proto = std::make_unique<PrototypeAST>("", std::vector<std::string>());
+		auto Proto = std::make_unique<PrototypeAST>(JITopt::ANONYMOUS_EXPR, std::vector<std::string>());
 		return std::make_unique<FunctionAST>(std::move(Proto), std::move(E));
 	}
 	return nullptr;
@@ -201,9 +201,13 @@ std::unique_ptr<FunctionAST> Parser::ParseTopLevelExpr() {
 void Parser::HandleDefinition() {
 	if (auto FnAST = ParseDefinition()) {
 		if (auto *FnIR = FnAST->codegen()) {
-			fprintf(stderr, "Read function definition");
+			fprintf(stderr, "Read function definition\n");
 			FnIR->print(errs());
 			fprintf(stderr, "\n");
+			Codegen::ExitOnErr(JITopt::TheJIT->addModule(
+						ThreadSafeModule(std::move(Codegen::TheModule), std::move(Codegen::Thecontext))));
+			//need to initialize after each function
+			JITopt::InitializeModuleAndPassManager();
 		}
 	}
 	else {
@@ -215,9 +219,10 @@ void Parser::HandleDefinition() {
 void Parser::HandleExtern() {
 	if (auto ProtoAST = ParseExtern()) {
 		if (auto *FnIR = ProtoAST->codegen()) {
-			fprintf(stderr, "Read extern: ");
+			fprintf(stderr, "Read extern: \n");
 			FnIR->print(errs());
 			fprintf(stderr, "\n");
+			Codegen::FunctionProtos[make_pair(ProtoAST->getName(), ProtoAST->getArgs().size())] = std::move(ProtoAST);
 		}
 	}
 	else {
@@ -227,26 +232,43 @@ void Parser::HandleExtern() {
 }
 
 void Parser::HandleTopLevelExpression() {
+	//Evaluate a top-level expression into an anonymous function
 	if (auto FnAST = ParseTopLevelExpr()) {
 		if (auto *FnIR = FnAST->codegen()) {
-			fprintf(stderr, "Read top-level expression:");
+
+			fprintf(stderr, "Read top-level expression:\n");
 			FnIR->print(errs());
 			fprintf(stderr, "\n");
+			/* Create a ResourceTracker to track JIT'd memory allocated to our
+			 * anonymous expression -- that way we can free it after execution
+			 */
+
+			auto RT = JITopt::TheJIT->getMainJITDylib().createResourceTracker();
+
+			auto TSM = ThreadSafeModule(std::move(Codegen::TheModule), std::move(Codegen::Thecontext));
+			//once the module is added to JIT it cannot be modified, thus we initialize modulepassmanager again.
+			Codegen::ExitOnErr(JITopt::TheJIT->addModule(std::move(TSM), RT));
+			JITopt::InitializeModuleAndPassManager();
+
+			// Search the JIT for the __anon_expr symbol
+			auto ExprSymbol = Codegen::ExitOnErr(JITopt::TheJIT->lookup(JITopt::ANONYMOUS_EXPR));
+
+			/* Get the symbol's address and cast it to the right type
+			 * (take no arguments, returns a double) so we can call it as a native function
+			 */
+			double (*FP)() = (double (*)())(intptr_t)ExprSymbol.getAddress();
+			fprintf(stderr, "Evualuated to %f\n", FP());
+
+			//Delete the anonymous Module from the jit
+			//remove from resouce tracker
+			Codegen::ExitOnErr(RT->remove());
+
 		}
 	}
 	else {
 		//skip the token for error recovery
 		getNextToken();
 	}
-}
-
-void Parser::InitializeModule() {
-	//Open a new context and module
-	Codegen::Thecontext = std::make_unique<LLVMContext>();
-	Codegen::TheModule = std::make_unique<Module>("my cool jit Arrakis", *(Codegen::Thecontext));
-
-	//Create a new builder for the module
-	Codegen::Builder = std::make_unique<IRBuilder<>>(*(Codegen::Thecontext));
 }
 
 int Parser::getCurTok() {

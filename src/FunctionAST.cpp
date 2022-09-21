@@ -1,62 +1,83 @@
 #include "FunctionAST.h"
 #include "Codegen.h"
 #include "llvm/IR/Verifier.h"
+#include "JitOptimizer.h"
 
 FunctionAST::FunctionAST(std::unique_ptr<PrototypeAST> Proto, std::unique_ptr<ExprAST> Body)
 	:Proto(std::move(Proto)), Body(std::move(Body)) {
 	}
 
 Function *FunctionAST::codegen() {
-	//First, check for an existing function with same name from previous extern declarations
-	Function *TheFunction = Codegen::TheModule->getFunction(Proto->getName());
+	// Transfer ownership of the prototype to the FunctionProtos map, but keep a
+	// reference to it for use below.
+	auto &protoref = *Proto;
+
+	if (Proto->getName() != JITopt::ANONYMOUS_EXPR) {
+		auto func = find_if(Codegen::FunctionProtos.begin(), Codegen::FunctionProtos.end(), 
+				[protoref](auto& itr) {
+				return itr.first.first == protoref.getName() && itr.first.second == protoref.getArgs().size();});
+
+		auto funcSameName = find_if(Codegen::FunctionProtos.begin(), Codegen::FunctionProtos.end(), 
+				[protoref](auto& itr) {
+				return itr.first.first == protoref.getName();});
+
+		std::string origName = Proto->getName();
+		if ((func !=funcSameName)&& funcSameName != Codegen::FunctionProtos.end()){
+			Proto->setName(Proto->getName() + "." + std::to_string(Codegen::FUNCTION_COUNTER++));	
+		}
+		else if (func == funcSameName && funcSameName != Codegen::FunctionProtos.end()) {
+			Function *TheFunction = Codegen::getFunction(make_pair(protoref.getName(), protoref.getArgs().size()));
+			if(!TheFunction->empty())
+				return (Function*)Codegen::LogErrorV("function is already definied");
+		}
+		Codegen::functionOverloadNameMap[make_pair(origName, Proto->getArgs().size())] = Proto->getName();
+	}
+	Codegen::FunctionProtos[make_pair(Proto->getName(), Proto->getArgs().size())] = std::move(Proto);
+	Function *TheFunction = Codegen::getFunction(make_pair(protoref.getName(), protoref.getArgs().size()));
 
 	if (TheFunction) {
-		if (TheFunction->arg_size() != Proto->getArgs().size())
+		if (TheFunction->arg_size() != protoref.getArgs().size())
 			TheFunction = nullptr;
 
 		if (TheFunction) {
 			int i = 0;
 			for (auto itr = TheFunction->arg_begin(); itr != TheFunction->arg_end() ; ++itr, ++i) {
-				itr->setName(Proto->getArgs()[i]);
+				itr->setName(protoref.getArgs()[i]);
 			}
 		}
 	}
-
-	//if not previous defined, first generate LLVM IR for prototype then proceed towards the body of the function
-	if (!TheFunction)
-		TheFunction = Proto->codegen();
 
 	if (!TheFunction)
 		return nullptr;
 
 	//if the function body is already generated, then exit since body should of function is begined redefined 
 	if (!TheFunction->empty())
-		return (Function*)Codegen::LogErrorV("function cannot be redefined");
+		return (Function*)Codegen::LogErrorV("duplicate function definition");
 
-	//Create a basic block who name is entry
+
+	// Create a new basic block to start insertion into.
 	BasicBlock *BB = BasicBlock::Create(*Codegen::Thecontext, "entry", TheFunction);
-	//Our whole function body represents one block as it does not have any control flow as of now, this tells LLVM to insert
-	//instructions after this block
 	Codegen::Builder->SetInsertPoint(BB);
 
-	//we add the function arguments of the NamedValues map so that they are available in current scope
+	// Record the function arguments in the NamedValues map.
 	Codegen::NamedValues.clear();
 	for (auto &Arg : TheFunction->args())
 		Codegen::NamedValues[std::string(Arg.getName())] = &Arg;
 
-	//generate body of the function
 	if (Value *RetVal = Body->codegen()) {
-		//add LLVM ret statment at the end of function
+		// Finish off the function.
 		Codegen::Builder->CreateRet(RetVal);
 
-		//used to validate the Thefunction generated, does a lot of checks
+		// Validate the generated code, checking for consistency.
 		verifyFunction(*TheFunction);
+
+		// Run the optimizer on the function.
+		Codegen::TheFPM->run(*TheFunction);
+
 		return TheFunction;
 	}
 
-	//error in generating body of the function, thus remove the function
-	//it removes it from the symbol table, thus if a user incorrectly types a function, he can further redefine it with its
-	//correct definition
+	// Error reading body, remove function.
 	TheFunction->eraseFromParent();
 	return nullptr;
 }

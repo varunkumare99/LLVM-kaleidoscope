@@ -16,6 +16,7 @@ class PrototypeAST {
         PrototypeAST(const std::string& Name, std::vector<std::string> Args);
         const std::string &getName() const;
 		const std::vector<std::string>& getArgs() const;
+		const void setName(const std::string &name);
 		Function *codegen();
 };
 

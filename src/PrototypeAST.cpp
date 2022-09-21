@@ -9,6 +9,10 @@ const std::string& PrototypeAST::getName() const {
     return Name;
 }
 
+const void PrototypeAST::setName(const std::string &name) {
+	Name = name;
+}
+
 const std::vector<std::string>& PrototypeAST::getArgs() const {
 	return Args;
 }

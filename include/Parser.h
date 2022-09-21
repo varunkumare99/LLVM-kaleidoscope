@@ -31,7 +31,6 @@ class Parser {
 	void HandleDefinition();
 	void HandleExtern();
 	void HandleTopLevelExpression();
-	void InitializeModule();
 	int getCurTok();
 
     private:
