@@ -257,12 +257,11 @@ void Parser::HandleTopLevelExpression() {
 			 * (take no arguments, returns a double) so we can call it as a native function
 			 */
 			double (*FP)() = (double (*)())(intptr_t)ExprSymbol.getAddress();
-			fprintf(stderr, "Evualuated to %f\n", FP());
+			fprintf(stderr, "Evaluated to %f\n", FP());
 
 			//Delete the anonymous Module from the jit
 			//remove from resouce tracker
 			Codegen::ExitOnErr(RT->remove());
-
 		}
 	}
 	else {

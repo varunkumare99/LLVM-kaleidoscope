@@ -21,7 +21,6 @@ namespace Codegen {
 		extern unsigned int FUNCTION_COUNTER;
 
 		extern Value *LogErrorV(const char *Str);
-		extern Function *getFunction(std::string Name);
 	    extern Function *getFunction(const std::pair<std::string, unsigned int>& functionName_args);
 }
 #endif

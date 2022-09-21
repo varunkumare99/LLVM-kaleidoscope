@@ -25,35 +25,20 @@ Function *FunctionAST::codegen() {
 		if ((func !=funcSameName)&& funcSameName != Codegen::FunctionProtos.end()){
 			Proto->setName(Proto->getName() + "." + std::to_string(Codegen::FUNCTION_COUNTER++));	
 		}
-		else if (func == funcSameName && funcSameName != Codegen::FunctionProtos.end()) {
-			Function *TheFunction = Codegen::getFunction(make_pair(protoref.getName(), protoref.getArgs().size()));
-			if(!TheFunction->empty())
-				return (Function*)Codegen::LogErrorV("function is already definied");
-		}
 		Codegen::functionOverloadNameMap[make_pair(origName, Proto->getArgs().size())] = Proto->getName();
 	}
 	Codegen::FunctionProtos[make_pair(Proto->getName(), Proto->getArgs().size())] = std::move(Proto);
 	Function *TheFunction = Codegen::getFunction(make_pair(protoref.getName(), protoref.getArgs().size()));
 
 	if (TheFunction) {
-		if (TheFunction->arg_size() != protoref.getArgs().size())
-			TheFunction = nullptr;
-
-		if (TheFunction) {
-			int i = 0;
-			for (auto itr = TheFunction->arg_begin(); itr != TheFunction->arg_end() ; ++itr, ++i) {
-				itr->setName(protoref.getArgs()[i]);
-			}
+		int i = 0;
+		for (auto itr = TheFunction->arg_begin(); itr != TheFunction->arg_end() ; ++itr, ++i) {
+			itr->setName(protoref.getArgs()[i]);
 		}
 	}
 
 	if (!TheFunction)
 		return nullptr;
-
-	//if the function body is already generated, then exit since body should of function is begined redefined 
-	if (!TheFunction->empty())
-		return (Function*)Codegen::LogErrorV("duplicate function definition");
-
 
 	// Create a new basic block to start insertion into.
 	BasicBlock *BB = BasicBlock::Create(*Codegen::Thecontext, "entry", TheFunction);
