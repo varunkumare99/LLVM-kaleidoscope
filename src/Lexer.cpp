@@ -18,6 +18,16 @@ int Lexer::gettok() {
             return Lexer::tok_def;
         if (IdentifierStr == "extern")
             return Lexer::tok_extern;
+        if (IdentifierStr == "if")
+            return Lexer::tok_if;
+        if (IdentifierStr == "then")
+            return Lexer::tok_then;
+        if (IdentifierStr == "else")
+            return Lexer::tok_else;
+        if (IdentifierStr == "for")
+            return Lexer::tok_for;
+        if (IdentifierStr == "in")
+            return Lexer::tok_in;
         else
             return Lexer::tok_identifier;
     }

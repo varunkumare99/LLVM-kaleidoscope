@@ -1,3 +1,6 @@
+#ifndef JITOPTIMIZER_H
+#define JITOPTIMIZER_H
+
 #include <iostream>
 #include "KaleidoscopeJIT.h"
 
@@ -7,3 +10,5 @@ namespace JITopt {
 	void InitializeModuleAndPassManager(void);
 	const std::string ANONYMOUS_EXPR = "__anon_expr";
 }
+
+#endif

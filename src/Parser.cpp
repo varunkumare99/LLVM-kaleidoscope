@@ -1,4 +1,6 @@
 #include "Parser.h"
+#include "ForExprAST.h"
+#include "IfExprAST.h"
 #include "BinaryExprAST.h"
 #include "NumberExprAST.h"
 #include "VariableExprAST.h"
@@ -86,6 +88,8 @@ std::unique_ptr<ExprAST> Parser::ParseIdentifierExpr() {
 //      ::identifierExpr
 //      ::numberExpr
 //      ::parenExpr
+//      ::ifelseExpr
+//      ::forExpr
 
 std::unique_ptr<ExprAST> Parser::ParsePrimary() {
 	switch (CurTok) {
@@ -95,6 +99,10 @@ std::unique_ptr<ExprAST> Parser::ParsePrimary() {
 			return ParseNumberExpr();
 		case '(':
 			return ParseParenExpr();
+		case Lexer::tok_if:
+			return ParseIfExpr();
+		case Lexer::tok_for:
+			return ParseForExpr();
 		default:
 			return LogError("unknown token when expecting an expression");
 	}
@@ -196,6 +204,81 @@ std::unique_ptr<FunctionAST> Parser::ParseTopLevelExpr() {
 		return std::make_unique<FunctionAST>(std::move(Proto), std::move(E));
 	}
 	return nullptr;
+}
+
+///forexpr ::= 'for' idenfifier '=' expr ',' expr (',', expr)? 'in' expression
+std::unique_ptr<ExprAST> Parser::ParseForExpr() {
+	getNextToken(); //eat the for
+
+	if (CurTok != Lexer::tok_identifier)
+		return LogError("expected identifier after for");
+
+	std::string IdName = lexer.getIdentifierStr();
+	getNextToken(); //eat the identifier
+
+	if (CurTok != '=')
+		return LogError("expected '=' after for");
+	getNextToken(); //eat '='.
+
+	auto Start = ParseExpression();
+	if (!Start)
+		return nullptr;
+
+	if (CurTok != ',')
+		return LogError("expected ',' after for start value");
+	getNextToken();
+
+	auto End = ParseExpression();
+	if (!End)
+		return nullptr;
+
+	// The step value is optional
+	std::unique_ptr<ExprAST> Step;
+	if (CurTok == ',') {
+		getNextToken(); //eat ','
+		Step = ParseExpression();
+		if (!Step)
+			return nullptr;
+	}
+
+	if (CurTok != Lexer::tok_in)
+		return LogError("expected 'in' after for");
+	getNextToken(); //eat 'in'
+
+	auto Body = ParseExpression();
+	if (!Body)
+		return nullptr;
+	return std::make_unique<ForExprAST>(IdName, std::move(Start), std::move(End), std::move(Step), std::move(Body));
+}
+
+///ifexpr ::= 'if' expression 'then' expression 'else' expression
+std::unique_ptr<ExprAST> Parser::ParseIfExpr() {
+	getNextToken(); //eat the if
+
+	//condition
+	auto Cond = ParseExpression();
+	if (!Cond)
+		return nullptr;
+
+	if (CurTok != Lexer::tok_then) {
+		return LogError("exprected Then token");
+	}
+	getNextToken(); //eat 'then' token
+
+	auto Then = ParseExpression();
+	if (!Then)
+		return nullptr;
+
+	if (CurTok != Lexer::tok_else) {
+		return LogError("expected else token");
+	}
+	getNextToken();
+
+	auto Else = ParseExpression();
+	if (!Else)
+		return nullptr;
+
+	return std::make_unique<IfExprAST>(std::move(Cond), std::move(Then), std::move(Else));
 }
 
 void Parser::HandleDefinition() {
