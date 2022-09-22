@@ -24,6 +24,7 @@ class Parser {
 	std::unique_ptr<PrototypeAST> ParseExtern();
 	std::unique_ptr<ExprAST> ParseIfExpr();
 	std::unique_ptr<ExprAST> ParseForExpr();
+	std::unique_ptr<ExprAST> ParseUnaryExpr();
 	int GetTokPrecedence();
 
 
@@ -34,11 +35,11 @@ class Parser {
 	void HandleExtern();
 	void HandleTopLevelExpression();
 	int getCurTok();
+    static std::map<char, int> BinopPrecendence;
 
     private:
     int CurTok;
     Lexer lexer;
-    static std::map<char, int> BinopPrecendence;
 };
 
 #endif

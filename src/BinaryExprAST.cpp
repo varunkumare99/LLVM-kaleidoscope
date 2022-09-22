@@ -23,6 +23,13 @@ Value *BinaryExprAST::codegen() {
 			//convert 0 or 1 to double 0.0 or 1.0 since our language understands only doubles
 			return Codegen::Builder->CreateUIToFP(L, Type::getDoubleTy(*Codegen::Thecontext), "booltmp");
 		default:
-			return Codegen::LogErrorV("invalid Binary operation");
+			break;
 	}
+
+	// if it wasn't a built-in operator, it must be a user definied. Emit a call to it
+	Function *F = Codegen::getFunction(std::make_pair(std::string("binary") + Op, 2));
+	assert(F && "binary operator not found!");
+
+	Value *Ops[2] = { L, R };
+	return Codegen::Builder->CreateCall(F, Ops, "binop");
 }

@@ -1,4 +1,5 @@
 #include "FunctionAST.h"
+#include "Parser.h"
 #include "Codegen.h"
 #include "llvm/IR/Verifier.h"
 #include "JitOptimizer.h"
@@ -39,6 +40,10 @@ Function *FunctionAST::codegen() {
 
 	if (!TheFunction)
 		return nullptr;
+
+	//If this is an operator, install it.
+	if (protoref.isBinaryOp())
+		Parser::BinopPrecendence[protoref.getOperatorName()] = protoref.getBinaryPrecedence();
 
 	// Create a new basic block to start insertion into.
 	BasicBlock *BB = BasicBlock::Create(*Codegen::Thecontext, "entry", TheFunction);

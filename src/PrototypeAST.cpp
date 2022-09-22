@@ -2,8 +2,8 @@
 #include "Codegen.h"
 #include <vector>
 
-PrototypeAST::PrototypeAST(const std::string& Name, std::vector<std::string> Args)
-    :Name(Name), Args(std::move(Args)) {}
+PrototypeAST::PrototypeAST(const std::string& Name, std::vector<std::string> Args, bool IsOperator, unsigned Precedence)
+    :Name(Name), Args(std::move(Args)), IsOperator(IsOperator), Precedence(Precedence) {}
 
 const std::string& PrototypeAST::getName() const {
     return Name;
@@ -15,6 +15,23 @@ const void PrototypeAST::setName(const std::string &name) {
 
 const std::vector<std::string>& PrototypeAST::getArgs() const {
 	return Args;
+}
+
+bool PrototypeAST::isUnaryOp() const {
+	return IsOperator && Args.size() == 1;
+}
+
+bool PrototypeAST::isBinaryOp() const {
+	return IsOperator && Args.size() == 2;
+}
+
+unsigned PrototypeAST::getBinaryPrecedence() const {
+	return Precedence;
+}
+
+char PrototypeAST::getOperatorName() const {
+	assert(isUnaryOp() || isBinaryOp());
+	return Name[Name.size() - 1];
 }
 
 Function *PrototypeAST::codegen() {

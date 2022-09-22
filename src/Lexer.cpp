@@ -28,6 +28,10 @@ int Lexer::gettok() {
             return Lexer::tok_for;
         if (IdentifierStr == "in")
             return Lexer::tok_in;
+        if (IdentifierStr == "binary")
+            return Lexer::tok_binary;
+        if (IdentifierStr == "unary")
+            return Lexer::tok_unary;
         else
             return Lexer::tok_identifier;
     }
