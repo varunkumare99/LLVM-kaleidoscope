@@ -15,6 +15,7 @@ class VarExprAST: public ExprAST {
 				std::unique_ptr<ExprAST> Body);
 
 		Value *codegen() override;
+		raw_ostream &dump(raw_ostream &out, int ind) override;
 };
 
 #endif

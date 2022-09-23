@@ -1,9 +1,10 @@
 #include "PrototypeAST.h"
 #include "Codegen.h"
 #include <vector>
+#include "DebugData.h"
 
-PrototypeAST::PrototypeAST(const std::string& Name, std::vector<std::string> Args, bool IsOperator, unsigned Precedence)
-    :Name(Name), Args(std::move(Args)), IsOperator(IsOperator), Precedence(Precedence) {}
+PrototypeAST::PrototypeAST(SourceLocation Loc, const std::string& Name, std::vector<std::string> Args, bool IsOperator, unsigned Precedence)
+    :Name(Name), Args(std::move(Args)), IsOperator(IsOperator), Precedence(Precedence), Line(Loc.Line) {}
 
 const std::string& PrototypeAST::getName() const {
     return Name;
@@ -49,4 +50,8 @@ Function *PrototypeAST::codegen() {
 		Arg.setName(Args[Idx++]);
 	//this sets our from function prototype in LLVM
 	return F;
+}
+
+int PrototypeAST::getLine() const {
+	return Line;
 }

@@ -5,6 +5,7 @@
 #include <memory>
 #include <vector>
 #include "llvm/IR/Function.h"
+struct SourceLocation;
 using namespace llvm;
 
 class PrototypeAST {
@@ -13,9 +14,9 @@ class PrototypeAST {
         std::vector<std::string> Args; //capture the function name and arguments
 		bool IsOperator;
 		unsigned Precedence; //Precedence if Operator is binary
-
+		int Line;
     public:
-        PrototypeAST(const std::string& Name, std::vector<std::string> Args, bool IsOperator = false, unsigned Prec = 0);
+        PrototypeAST(SourceLocation Loc, const std::string& Name, std::vector<std::string> Args, bool IsOperator = false, unsigned Prec = 0);
         const std::string &getName() const;
 		const std::vector<std::string>& getArgs() const;
 		const void setName(const std::string &name);
@@ -25,6 +26,7 @@ class PrototypeAST {
 		bool isBinaryOp() const;
 		unsigned getBinaryPrecedence() const;
 		char getOperatorName() const;
+		int getLine() const;
 };
 
 #endif

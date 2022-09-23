@@ -12,6 +12,7 @@ class FunctionAST {
     public:
         FunctionAST(std::unique_ptr<PrototypeAST> Proto, std::unique_ptr<ExprAST> Body);
 		Function *codegen();
+		raw_ostream &dump(raw_ostream &out, int ind);
 };
 
 #endif

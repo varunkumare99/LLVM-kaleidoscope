@@ -1,4 +1,5 @@
 #include "Lexer.h"
+#include "DebugData.h"
 
 Lexer::Lexer(std::string str, double val): IdentifierStr(str), NumVal(val) {}
 
@@ -7,11 +8,13 @@ int Lexer::gettok() {
 
 	//skip any white space
 	while (isspace(LastChar))
-		LastChar = getchar();
+		LastChar = advance();
+
+	CurLoc = LexLoc;
 
 	if (isalpha(LastChar)) { // identifier: [a-zA-Z][a-zA-Z0-9]*
 		IdentifierStr = LastChar;
-		while (isalnum((LastChar = getchar())))
+		while (isalnum((LastChar = advance())))
 			IdentifierStr += LastChar;
 
 		if (IdentifierStr == "def")
@@ -42,7 +45,7 @@ int Lexer::gettok() {
 
 		do {
 			Numstr += LastChar;
-			LastChar = getchar();
+			LastChar = advance();
 		}while (isdigit(LastChar) || LastChar == '.');
 		NumVal = strtod(Numstr.c_str(), 0);
 		return Lexer::tok_number;
@@ -51,7 +54,7 @@ int Lexer::gettok() {
 	if (LastChar == '#') {
 		// comment till end of line
 		do {
-			LastChar = getchar();
+			LastChar = advance();
 		}while (LastChar != EOF || LastChar != '\n' || LastChar != '\r');
 
 		if (LastChar != EOF)
@@ -64,7 +67,7 @@ int Lexer::gettok() {
 
 	//return char as its ascii value
 	int thisChar = LastChar;
-	LastChar = getchar();
+	LastChar = advance();
 	return thisChar;
 }
 
@@ -74,4 +77,17 @@ double Lexer::getNumVal() {
 
 std::string Lexer::getIdentifierStr() {
 	return IdentifierStr;
+}
+
+int Lexer::advance() {
+	int LastChar = getchar();
+
+	if (LastChar == '\n' || LastChar == '\r') {
+		LexLoc.Line++;
+		LexLoc.Col = 0;
+	}
+	else {
+		LexLoc.Col++;
+	}
+	return LastChar;
 }

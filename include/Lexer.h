@@ -36,6 +36,7 @@ class Lexer {
         int gettok();
         double getNumVal();
         std::string getIdentifierStr();
+		int advance();
 
     private:
         std::string IdentifierStr; //filled if tok_identifier

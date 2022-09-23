@@ -1,7 +1,7 @@
 #include "Parser.h"
 #include "JitOptimizer.h"
 #include "Codegen.h"
-#include <memory>
+#include "DebugData.h"
 #include "KaleidoscopeJIT.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Host.h"
@@ -19,19 +19,19 @@
 
 /// putchard - putchar that takes a double and returns 0.
 extern "C" DLLEXPORT double putchard(double X) {
-  fputc((char)X, stderr);
-  return 0;
+	fputc((char)X, stderr);
+	return 0;
 }
 
 /// printd - printf that takes a double prints it as "%f\n", returning 0.
 extern "C" DLLEXPORT double printd(double X) {
-  fprintf(stderr, "%f\n", X);
-  return 0;
+	fprintf(stderr, "%f\n", X);
+	return 0;
 }
 //top := definition | external | expression | ';'
 void MainLoop(Parser& parser) {
 	while (true) {
-		fprintf(stderr, "ready>>> ");
+		/* fprintf(stderr, "ready>>> "); */
 		switch (parser.getCurTok()) {
 			case Lexer::tok_eof:
 				return;
@@ -52,70 +52,44 @@ void MainLoop(Parser& parser) {
 }
 
 int main() {
-	//get first token
-	fprintf(stderr, "ready>>> ");
+	InitializeNativeTarget();
+	InitializeNativeTargetAsmPrinter();
+	InitializeNativeTargetAsmParser();
+
 	Lexer lex;
 	Parser parser(lex);
+	//prime the next token
 	parser.getNextToken();	
-	//Make the module which holds the code
-	/* JITopt::TheJIT = Codegen::ExitOnErr(KaleidoscopeJIT::Create()); */
-	JITopt::InitializeModuleAndPassManager();
+
+	JITopt::TheJIT = Codegen::ExitOnErr(KaleidoscopeJIT::Create());
+
+	JITopt::InitializeModule();
+
+	//Add the current debug info version into the module.
+	Codegen::TheModule->addModuleFlag(Module::Warning, "Debug Info Version", DEBUG_METADATA_VERSION);
+
+	//Darwin only supports dwarf2
+	if (Triple(sys::getProcessTriple()).isOSDarwin()) {
+		Codegen::TheModule->addModuleFlag(llvm::Module::Warning, "Dwarf Version", 2);
+	}
+
+	//Construct the DIBuilder, we do this here because we need the module
+	DBuilder = std::make_unique<DIBuilder>(*Codegen::TheModule);
+
+	// Create the compile unit for the module.
+	// Currently down as "fib.ks" as a filename since we're redirecting stdin
+	// but we'd like actual source locations
+	KSDbgInfo.TheCu = DBuilder->createCompileUnit(
+			dwarf::DW_LANG_C, DBuilder->createFile("fib.ks", "."),
+			"Kaleidoscope Compiler", 0, "", 0);
+
+	//Run the main interpreter loop now
 	MainLoop(parser);
 
-	// Initialize the target registry etc.
-	InitializeAllTargetInfos();
-	InitializeAllTargets();
-	InitializeAllTargetMCs();
-	InitializeAllAsmParsers();
-	InitializeAllAsmPrinters();
+	//Finalize the debug info
+	DBuilder->finalize();
 
-	auto TargetTriple = sys::getDefaultTargetTriple();
-	Codegen::TheModule->setTargetTriple(TargetTriple);
-
-	std::string Error;
-	auto Target = TargetRegistry::lookupTarget(TargetTriple, Error);
-
-	// Print an error and exit if we couldn't find the requested target.
-	// This generally occurs if we've forgotten to initialise the
-	// TargetRegistry or we have a bogus target triple.
-	if (!Target) {
-		errs() << Error;
-		return 1;
-	}
-
-	auto CPU = "generic";
-	auto Features = "";
-
-	TargetOptions opt;
-	auto RM = Optional<Reloc::Model>();
-	auto TheTargetMachine =
-		Target->createTargetMachine(TargetTriple, CPU, Features, opt, RM);
-
-	Codegen::TheModule->setDataLayout(TheTargetMachine->createDataLayout());
-
-	auto Filename = "output.o";
-	std::error_code EC;
-	raw_fd_ostream dest(Filename, EC, sys::fs::OF_None);
-
-	if (EC) {
-		errs() << "Could not open file: " << EC.message();
-		return 1;
-	}
-
-	legacy::PassManager pass;
-	auto FileType = CGFT_ObjectFile;
-
-	if (TheTargetMachine->addPassesToEmitFile(pass, dest, nullptr, FileType)) {
-		errs() << "TheTargetMachine can't emit a file of this type";
-		return 1;
-	}
-
-	pass.run(*Codegen::TheModule);
-	dest.flush();
-
-	outs() << "Wrote " << Filename << "\n";
-
-	//dump all the llvm IR on exit
+	//Print out all the generated code
 	Codegen::TheModule->print(errs(), nullptr);
 	return 0;
 }

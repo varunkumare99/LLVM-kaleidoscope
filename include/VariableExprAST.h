@@ -8,9 +8,10 @@ class VariableExprAST: public ExprAST {
     std::string Name; //capture name in ast
 
     public:
-    VariableExprAST(const std::string &name);
+    VariableExprAST(SourceLocation Loc, const std::string &name);
 	Value *codegen() override;
 	const std::string& getName();
+	raw_ostream &dump(raw_ostream &out, int ind) override;
 };
 
 #endif

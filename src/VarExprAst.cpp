@@ -45,6 +45,7 @@ Value *VarExprAST::codegen() {
 		Codegen::NamedValues[VarName] = Alloca;
 	}
 
+	KSDbgInfo.emitLocation(this);
 	// codegen the body, now that all vars are in scope
 	Value *BodyVal = Body->codegen();
 	if (!BodyVal)
@@ -57,4 +58,12 @@ Value *VarExprAST::codegen() {
 
 	//Return the body computation
 	return BodyVal;
+}
+
+raw_ostream &VarExprAST::dump(raw_ostream &out, int ind) {
+	ExprAST::dump(out << "var", ind);
+	for (const auto &NameVar: VarNames)
+		NameVar.second->dump(indent(out, ind) << NameVar.first << ':', ind + 1);
+	Body->dump(indent(out, ind) << "Body:", ind + 1);
+	return out;
 }

@@ -4,10 +4,11 @@
 #include "llvm/IR/Module.h"
 #include "JitOptimizer.h"
 
-CallExprAST::CallExprAST(const std::string& Callee, std::vector<std::unique_ptr<ExprAST>> Args)
-	:Callee(Callee), Args(std::move(Args)) {}
+CallExprAST::CallExprAST(SourceLocation Loc, const std::string& Callee, std::vector<std::unique_ptr<ExprAST>> Args)
+	:ExprAST(Loc), Callee(Callee), Args(std::move(Args)) {}
 
 	Value *CallExprAST::codegen() {
+		KSDbgInfo.emitLocation(this);
 		// Look up the name in the global module table.
 		Function *CalleeF;
 		if (Callee != JITopt::ANONYMOUS_EXPR) {
@@ -35,3 +36,10 @@ CallExprAST::CallExprAST(const std::string& Callee, std::vector<std::unique_ptr<
 
 		return Codegen::Builder->CreateCall(CalleeF, ArgsV, "calltmp");
 	}
+
+raw_ostream &CallExprAST::dump(raw_ostream &out, int ind) {
+	ExprAST::dump(out << "call " << Callee, ind);
+	for (const auto &Arg: Args)
+		Arg->dump(indent(out, ind + 1), ind + 1);
+	return out;
+}

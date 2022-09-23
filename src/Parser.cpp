@@ -56,10 +56,12 @@ std::unique_ptr<ExprAST> Parser::ParseParenExpr() {
 std::unique_ptr<ExprAST> Parser::ParseIdentifierExpr() {
 	std::string IdName = lexer.getIdentifierStr();
 
+	SourceLocation LitLoc = CurLoc;
+
 	getNextToken(); //eat identifier
 
 	if (CurTok != '(')
-		return std::make_unique<VariableExprAST>(IdName);
+		return std::make_unique<VariableExprAST>(LitLoc, IdName);
 
 	//Call
 	getNextToken(); //eat '('
@@ -83,7 +85,7 @@ std::unique_ptr<ExprAST> Parser::ParseIdentifierExpr() {
 	//eat token ')'
 	getNextToken();
 	
-	return std::make_unique<CallExprAST>(IdName, std::move(Args));
+	return std::make_unique<CallExprAST>(LitLoc, IdName, std::move(Args));
 }
 
 //primary
@@ -209,6 +211,7 @@ std::unique_ptr<ExprAST> Parser::ParseBinOpRHS(int ExprPrec, std::unique_ptr<Exp
 			return LHS;
 
 		int BinOp = CurTok;
+		SourceLocation BinLoc = CurLoc;
 		getNextToken(); //eat binOp
 
 		//Parse the unary expression after the binary operator
@@ -226,7 +229,7 @@ std::unique_ptr<ExprAST> Parser::ParseBinOpRHS(int ExprPrec, std::unique_ptr<Exp
 		}
 		
 		//merge LHS/RHS
-		LHS = std::make_unique<BinaryExprAST>(BinOp, std::move(LHS), std::move(RHS));
+		LHS = std::make_unique<BinaryExprAST>(BinLoc, BinOp, std::move(LHS), std::move(RHS));
 	}
 }
 
@@ -237,6 +240,7 @@ std::unique_ptr<ExprAST> Parser::ParseBinOpRHS(int ExprPrec, std::unique_ptr<Exp
 std::unique_ptr<PrototypeAST> Parser::ParsePrototype() {
 	std::string Fname;
 
+	SourceLocation FnLoc = CurLoc;
 	unsigned Kind = 0; //0 = identifier, 1 = unary, 2 = binary.
 	unsigned BinaryPrecendence = 30;
 
@@ -295,7 +299,7 @@ std::unique_ptr<PrototypeAST> Parser::ParsePrototype() {
 	if (Kind && ArgNames.size() != Kind)
 		return LogErrorP("Invalid number of operands for operator");
 
-	return std::make_unique<PrototypeAST>(Fname, std::move(ArgNames), Kind != 0, BinaryPrecendence);
+	return std::make_unique<PrototypeAST>(FnLoc, Fname, std::move(ArgNames), Kind != 0, BinaryPrecendence);
 }
 
 ///definition := 'def' prototype expression
@@ -314,11 +318,14 @@ std::unique_ptr<PrototypeAST> Parser::ParseExtern() {
 	getNextToken(); //eat extern
 	return ParsePrototype();
 }
+
 //toplevelexpr := expression
 std::unique_ptr<FunctionAST> Parser::ParseTopLevelExpr() {
+	SourceLocation FnLoc = CurLoc;
 	if (auto E = ParseExpression()) {
 		//Make a anonymous Proto
-		auto Proto = std::make_unique<PrototypeAST>(JITopt::ANONYMOUS_EXPR, std::vector<std::string>());
+		/* auto Proto = std::make_unique<PrototypeAST>(FnLoc, JITopt::ANONYMOUS_EXPR, std::vector<std::string>()); */
+		auto Proto = std::make_unique<PrototypeAST>(FnLoc, "main", std::vector<std::string>());
 		return std::make_unique<FunctionAST>(std::move(Proto), std::move(E));
 	}
 	return nullptr;
@@ -371,6 +378,7 @@ std::unique_ptr<ExprAST> Parser::ParseForExpr() {
 
 ///ifexpr ::= 'if' expression 'then' expression 'else' expression
 std::unique_ptr<ExprAST> Parser::ParseIfExpr() {
+	SourceLocation IfLoc = CurLoc;
 	getNextToken(); //eat the if
 
 	//condition
@@ -396,19 +404,13 @@ std::unique_ptr<ExprAST> Parser::ParseIfExpr() {
 	if (!Else)
 		return nullptr;
 
-	return std::make_unique<IfExprAST>(std::move(Cond), std::move(Then), std::move(Else));
+	return std::make_unique<IfExprAST>(IfLoc, std::move(Cond), std::move(Then), std::move(Else));
 }
 
 void Parser::HandleDefinition() {
 	if (auto FnAST = ParseDefinition()) {
-		if (auto *FnIR = FnAST->codegen()) {
-			fprintf(stderr, "Read function definition\n");
-			FnIR->print(errs());
-			fprintf(stderr, "\n");
-			/* Codegen::ExitOnErr(JITopt::TheJIT->addModule( */
-						/* ThreadSafeModule(std::move(Codegen::TheModule), std::move(Codegen::Thecontext)))); */
-			//need to initialize after each function
-			/* JITopt::InitializeModuleAndPassManager(); */
+		if (!FnAST->codegen()) {
+			fprintf(stderr, "Error Reading function definition\n");
 		}
 	}
 	else {
@@ -419,10 +421,10 @@ void Parser::HandleDefinition() {
 
 void Parser::HandleExtern() {
 	if (auto ProtoAST = ParseExtern()) {
-		if (auto *FnIR = ProtoAST->codegen()) {
-			fprintf(stderr, "Read extern: \n");
-			FnIR->print(errs());
-			fprintf(stderr, "\n");
+		if (!ProtoAST->codegen()) {
+			fprintf(stderr, "Error Reading extern: \n");
+		}
+		else {
 			Codegen::FunctionProtos[make_pair(ProtoAST->getName(), ProtoAST->getArgs().size())] = std::move(ProtoAST);
 		}
 	}
@@ -435,34 +437,8 @@ void Parser::HandleExtern() {
 void Parser::HandleTopLevelExpression() {
 	//Evaluate a top-level expression into an anonymous function
 	if (auto FnAST = ParseTopLevelExpr()) {
-		if (auto *FnIR = FnAST->codegen()) {
-
-			fprintf(stderr, "Read top-level expression:\n");
-			FnIR->print(errs());
-			fprintf(stderr, "\n");
-			/* Create a ResourceTracker to track JIT'd memory allocated to our
-			 * anonymous expression -- that way we can free it after execution
-			 */
-
-			/* auto RT = JITopt::TheJIT->getMainJITDylib().createResourceTracker();*/
-
-			/* auto TSM = ThreadSafeModule(std::move(Codegen::TheModule), std::move(Codegen::Thecontext));*/
-			/* //once the module is added to JIT it cannot be modified, thus we initialize modulepassmanager again.*/
-			/* Codegen::ExitOnErr(JITopt::TheJIT->addModule(std::move(TSM), RT));*/
-			/* JITopt::InitializeModuleAndPassManager(); */
-
-			/* // Search the JIT for the __anon_expr symbol*/
-			/* auto ExprSymbol = Codegen::ExitOnErr(JITopt::TheJIT->lookup(JITopt::ANONYMOUS_EXPR));*/
-
-			/* Get the symbol's address and cast it to the right type*/
-			/*  * (take no arguments, returns a double) so we can call it as a native function*/
-			/* */
-			/* double (*FP)() = (double (*)())(intptr_t)ExprSymbol.getAddress();*/
-			/* fprintf(stderr, "Evaluated to %f\n", FP());*/
-
-			/* //Delete the anonymous Module from the jit*/
-			/* //remove from resouce tracker*/
-			/* Codegen::ExitOnErr(RT->remove());*/
+		if (!FnAST->codegen()) {
+			fprintf(stderr, "Error generating code for top-level expression:\n");
 		}
 	}
 	else {

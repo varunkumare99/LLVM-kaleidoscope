@@ -11,6 +11,7 @@ class UnaryExprAST: public ExprAST {
 	public:
 	UnaryExprAST(char Opcode, std::unique_ptr<ExprAST> Operand);
 	Value *codegen() override;
+	raw_ostream &dump(raw_ostream &out, int ind) override;
 };
 
 #endif

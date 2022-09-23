@@ -12,6 +12,7 @@ class ForExprAST: public ExprAST {
 		ForExprAST(const std::string &VarName, std::unique_ptr<ExprAST> Start,std::unique_ptr<ExprAST> End,std::unique_ptr<ExprAST> Step,std::unique_ptr<ExprAST> Body); 
 
 		Value *codegen() override;
+		raw_ostream &dump(raw_ostream &out, int ind) override;
 };
 
 #endif

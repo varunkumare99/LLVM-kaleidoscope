@@ -8,6 +8,7 @@ class NumberExprAST: public ExprAST{
 
 	public:
 		NumberExprAST(double Val);
+		raw_ostream &dump(raw_ostream &out, int ind) override;
 		Value *codegen() override;
 };
 

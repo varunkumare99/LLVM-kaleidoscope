@@ -10,6 +10,8 @@ Value *ForExprAST::codegen() {
 	//Create an alloca for the variable in the entry block
 	AllocaInst *Alloca = Codegen::CreateEntryBlockAlloca(TheFunction, VarName);
 
+	KSDbgInfo.emitLocation(this);
+
 	//Emit the Start code first, without 'variable' in scope.
 	Value *StartVal = Start->codegen();
 	if (!StartVal)
@@ -82,4 +84,13 @@ Value *ForExprAST::codegen() {
 
 	// for expr always returns 0.0
 	return Constant::getNullValue(Type::getDoubleTy(*Codegen::Thecontext));
+}
+
+raw_ostream &ForExprAST::dump(raw_ostream &out, int ind) {
+	ExprAST::dump(out << "for", ind);
+	Start->dump(indent(out, ind) << "Cond:", ind + 1);
+	End->dump(indent(out, ind) << "End:", ind + 1);
+	Step->dump(indent(out, ind) << "Step:", ind + 1);
+	Body->dump(indent(out, ind) << "Body:", ind + 1);
+	return out;
 }

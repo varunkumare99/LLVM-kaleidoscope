@@ -1,10 +1,11 @@
 #include "IfExprAST.h"
 #include <Codegen.h>
 
-IfExprAST::IfExprAST(std::unique_ptr<ExprAST> Cond, std::unique_ptr<ExprAST> Then, std::unique_ptr<ExprAST> Else)
-	:Cond(std::move(Cond)), Then(std::move(Then)), Else(std::move(Else)) {}
+IfExprAST::IfExprAST(SourceLocation Loc, std::unique_ptr<ExprAST> Cond, std::unique_ptr<ExprAST> Then, std::unique_ptr<ExprAST> Else)
+	:ExprAST(Loc), Cond(std::move(Cond)), Then(std::move(Then)), Else(std::move(Else)) {}
 
 Value *IfExprAST::codegen() {
+	KSDbgInfo.emitLocation(this);
 	Value *CondV = Cond->codegen();
 	if (!CondV)
 		return nullptr;
@@ -63,3 +64,10 @@ Value *IfExprAST::codegen() {
 	return PN;
 }
 
+raw_ostream &IfExprAST::dump(raw_ostream &out, int ind) {
+	ExprAST::dump(out << "if", ind);
+	Cond->dump(indent(out, ind) << "Cond:", ind + 1);
+	Then->dump(indent(out, ind) << "Then:", ind + 1);
+	Else->dump(indent(out, ind) << "Else:", ind + 1);
+	return out;
+}

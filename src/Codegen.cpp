@@ -42,7 +42,7 @@ namespace Codegen {
 
 		//TmpB points at the first instruction of the entry block
 		IRBuilder<> TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
-		return TmpB.CreateAlloca(Type::getDoubleTy(*Thecontext), 0, Varname.c_str());
+		return TmpB.CreateAlloca(Type::getDoubleTy(*Thecontext), nullptr, Varname.c_str());
 	}
 
 	std::unique_ptr<LLVMContext> Thecontext;

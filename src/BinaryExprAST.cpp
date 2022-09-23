@@ -1,10 +1,11 @@
 #include "BinaryExprAST.h"
 #include "VariableExprAST.h"
 #include "Codegen.h"
-BinaryExprAST::BinaryExprAST(char Op, std::unique_ptr<ExprAST> LHS, std::unique_ptr<ExprAST> RHS)
-    :Op(Op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
+BinaryExprAST::BinaryExprAST(SourceLocation Loc, char Op, std::unique_ptr<ExprAST> LHS, std::unique_ptr<ExprAST> RHS)
+    :ExprAST(Loc), Op(Op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
 
 Value *BinaryExprAST::codegen() {
+	KSDbgInfo.emitLocation(this);
 	//special case '=' because we don't want to emit the LHS as an expresson
 	if (Op == '=') {
 		//Assignment requires the LHS to be an identifier.
@@ -55,4 +56,11 @@ Value *BinaryExprAST::codegen() {
 
 	Value *Ops[2] = { L, R };
 	return Codegen::Builder->CreateCall(F, Ops, "binop");
+}
+
+raw_ostream &BinaryExprAST::dump(raw_ostream &out, int ind) {
+	ExprAST::dump(out << "binary" << Op, ind);
+	LHS->dump(indent(out, ind) << "LHS:", ind + 1);
+	RHS->dump(indent(out, ind) << "RHS:", ind + 1);
+	return out;
 }
