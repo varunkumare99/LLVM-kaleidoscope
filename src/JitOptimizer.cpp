@@ -16,7 +16,7 @@ namespace JITopt {
 		Codegen::TheModule = std::make_unique<Module>("my cool jit", *(Codegen::Thecontext));
 
 		//setup data layout for jit
-		Codegen::TheModule->setDataLayout(JITopt::TheJIT->getDataLayout());
+		/* Codegen::TheModule->setDataLayout(JITopt::TheJIT->getDataLayout()); */
 
 		//Creat a new builder for the module
 		Codegen::Builder = std::make_unique<IRBuilder<>>(*Codegen::Thecontext);

@@ -405,10 +405,10 @@ void Parser::HandleDefinition() {
 			fprintf(stderr, "Read function definition\n");
 			FnIR->print(errs());
 			fprintf(stderr, "\n");
-			Codegen::ExitOnErr(JITopt::TheJIT->addModule(
-						ThreadSafeModule(std::move(Codegen::TheModule), std::move(Codegen::Thecontext))));
+			/* Codegen::ExitOnErr(JITopt::TheJIT->addModule( */
+						/* ThreadSafeModule(std::move(Codegen::TheModule), std::move(Codegen::Thecontext)))); */
 			//need to initialize after each function
-			JITopt::InitializeModuleAndPassManager();
+			/* JITopt::InitializeModuleAndPassManager(); */
 		}
 	}
 	else {
@@ -444,25 +444,25 @@ void Parser::HandleTopLevelExpression() {
 			 * anonymous expression -- that way we can free it after execution
 			 */
 
-			auto RT = JITopt::TheJIT->getMainJITDylib().createResourceTracker();
+			/* auto RT = JITopt::TheJIT->getMainJITDylib().createResourceTracker();*/
 
-			auto TSM = ThreadSafeModule(std::move(Codegen::TheModule), std::move(Codegen::Thecontext));
-			//once the module is added to JIT it cannot be modified, thus we initialize modulepassmanager again.
-			Codegen::ExitOnErr(JITopt::TheJIT->addModule(std::move(TSM), RT));
-			JITopt::InitializeModuleAndPassManager();
+			/* auto TSM = ThreadSafeModule(std::move(Codegen::TheModule), std::move(Codegen::Thecontext));*/
+			/* //once the module is added to JIT it cannot be modified, thus we initialize modulepassmanager again.*/
+			/* Codegen::ExitOnErr(JITopt::TheJIT->addModule(std::move(TSM), RT));*/
+			/* JITopt::InitializeModuleAndPassManager(); */
 
-			// Search the JIT for the __anon_expr symbol
-			auto ExprSymbol = Codegen::ExitOnErr(JITopt::TheJIT->lookup(JITopt::ANONYMOUS_EXPR));
+			/* // Search the JIT for the __anon_expr symbol*/
+			/* auto ExprSymbol = Codegen::ExitOnErr(JITopt::TheJIT->lookup(JITopt::ANONYMOUS_EXPR));*/
 
-			/* Get the symbol's address and cast it to the right type
-			 * (take no arguments, returns a double) so we can call it as a native function
-			 */
-			double (*FP)() = (double (*)())(intptr_t)ExprSymbol.getAddress();
-			fprintf(stderr, "Evaluated to %f\n", FP());
+			/* Get the symbol's address and cast it to the right type*/
+			/*  * (take no arguments, returns a double) so we can call it as a native function*/
+			/* */
+			/* double (*FP)() = (double (*)())(intptr_t)ExprSymbol.getAddress();*/
+			/* fprintf(stderr, "Evaluated to %f\n", FP());*/
 
-			//Delete the anonymous Module from the jit
-			//remove from resouce tracker
-			Codegen::ExitOnErr(RT->remove());
+			/* //Delete the anonymous Module from the jit*/
+			/* //remove from resouce tracker*/
+			/* Codegen::ExitOnErr(RT->remove());*/
 		}
 	}
 	else {
