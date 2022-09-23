@@ -6,3 +6,4 @@
 4. Adding JIT and Optimizer support
 5. Control flow (if-then-else and for-in)
 6. User-defined operators
+7. Mutable Variables

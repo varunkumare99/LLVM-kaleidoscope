@@ -7,5 +7,11 @@ Value *VariableExprAST::codegen() {
 	Value *V = Codegen::NamedValues[Name];
 	if (!V)
 		Codegen::LogErrorV("Unknown Variable Name");
-	return V;
+	
+	//load the value
+	return Codegen::Builder->CreateLoad(Type::getDoubleTy(*Codegen::Thecontext), V, Name.c_str());
+}
+
+const std::string &VariableExprAST::getName() {
+	return Name;
 }

@@ -1,9 +1,32 @@
 #include "BinaryExprAST.h"
+#include "VariableExprAST.h"
 #include "Codegen.h"
 BinaryExprAST::BinaryExprAST(char Op, std::unique_ptr<ExprAST> LHS, std::unique_ptr<ExprAST> RHS)
     :Op(Op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
 
 Value *BinaryExprAST::codegen() {
+	//special case '=' because we don't want to emit the LHS as an expresson
+	if (Op == '=') {
+		//Assignment requires the LHS to be an identifier.
+		VariableExprAST *LHSE = dynamic_cast<VariableExprAST*>(LHS.get());
+		if (!LHSE)
+			return Codegen::LogErrorV("destination of '=' must be a variable");
+		
+		//codegen the RHS
+		Value *Val = RHS->codegen();
+		if (!Val)
+			return nullptr;
+
+		//Lookup the name.
+		Value *Variable = Codegen::NamedValues[LHSE->getName()];
+		if (!Variable)
+			return Codegen::LogErrorV("Unknown variable name");
+
+		//store the RHS values in variable(alloca)
+		Codegen::Builder->CreateStore(Val, Variable);
+		return Val;
+	}
+
 	Value *L = LHS->codegen();
 	Value *R = RHS->codegen();
 	if (!L || !R)

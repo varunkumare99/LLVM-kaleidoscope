@@ -1,11 +1,11 @@
 #include "KaleidoscopeJIT.h"
-#include <memory>
 #include "Codegen.h"
 #include "JitOptimizer.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
+#include "llvm/Transforms/Utils.h"
 
 namespace JITopt {
 
@@ -23,6 +23,9 @@ namespace JITopt {
 
 		//Pass manager to attach to the module
 		Codegen::TheFPM = std::make_unique<legacy::FunctionPassManager>(Codegen::TheModule.get());
+
+		// Promote allocas to registers
+		Codegen::TheFPM->add(createPromoteMemoryToRegisterPass());
 
 		// peephole and bit twiddling optimizations
 		Codegen::TheFPM->add(createInstructionCombiningPass());

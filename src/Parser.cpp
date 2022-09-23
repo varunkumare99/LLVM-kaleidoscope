@@ -1,4 +1,5 @@
 #include "Parser.h"
+#include "VarExprAST.h"
 #include "UnaryExprAST.h"
 #include "ForExprAST.h"
 #include "IfExprAST.h"
@@ -10,7 +11,7 @@
 #include <memory>
 #include "Codegen.h"
 
-std::map<char, int> Parser::BinopPrecendence = { {'<', 10}, {'+', 20}, {'-', 20}, {'*', 40}, {'/', 50}};
+std::map<char, int> Parser::BinopPrecendence = {{'=', 2}, {'<', 10}, {'+', 20}, {'-', 20}, {'*', 40}, {'/', 50}};
 
 Parser::Parser(Lexer lex, int tok) : CurTok(tok), lexer(lex) {}
 
@@ -91,7 +92,7 @@ std::unique_ptr<ExprAST> Parser::ParseIdentifierExpr() {
 //      ::parenExpr
 //      ::ifelseExpr
 //      ::forExpr
-
+//		::varExpr
 std::unique_ptr<ExprAST> Parser::ParsePrimary() {
 	switch (CurTok) {
 		case Lexer::tok_identifier:
@@ -104,14 +105,64 @@ std::unique_ptr<ExprAST> Parser::ParsePrimary() {
 			return ParseIfExpr();
 		case Lexer::tok_for:
 			return ParseForExpr();
+		case Lexer::tok_var:
+			return ParseVarExpr();
 		default:
 			return LogError("unknown token when expecting an expression");
 	}
 }
 
+/// varexpr ::= 'var' identifier ('=' expression)?
+//						(',' identifier ('=' expression)?)* 'in' expression
+std::unique_ptr<ExprAST> Parser::ParseVarExpr() {
+	getNextToken(); //eat 'var' token
+
+	std::vector<std::pair<std::string, std::unique_ptr<ExprAST>>> VarNames;
+
+	//At least one variable name is required.
+	if (CurTok != Lexer::tok_identifier)
+		return LogError("expected identifier after var");
+
+	while (1) {
+		std::string Name = lexer.getIdentifierStr();
+		getNextToken(); //eat 'identifier' token
+
+		//Read the optional initialzer.
+		std::unique_ptr<ExprAST> Init;
+		if (CurTok == '=') {
+			getNextToken(); // eat the '='
+
+			Init = ParseExpression();
+			if (!Init)
+				return nullptr;
+		}
+
+		VarNames.push_back(std::make_pair(Name, std::move(Init)));
+		
+		//End of Var list, exit loop
+		if (CurTok != ',')
+			break;
+		getNextToken(); // eat ',' token
+
+		if (CurTok != Lexer::tok_identifier)
+			return LogError("expected identifier list after var");
+	}
+
+	//at this point we have 'in'
+	if (CurTok != Lexer::tok_in)
+		return LogError("expected 'in' keyword after 'var'");
+	getNextToken(); //eat 'in' token
+
+	auto Body = ParseExpression();
+	if (!Body)
+		return nullptr;
+	return std::make_unique<VarExprAST>(std::move(VarNames), std::move(Body));
+}
+
 ///unary
 //     ::=primary
 //     ::='!'unary
+
 std::unique_ptr<ExprAST> Parser::ParseUnaryExpr() {
 	// if the current token is an operator it must be a primary expression
 	if (!isascii(CurTok) || CurTok == '(' || CurTok == ',')

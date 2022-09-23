@@ -5,15 +5,20 @@ ForExprAST::ForExprAST(const std::string &VarName, std::unique_ptr<ExprAST> Star
 	:VarName(VarName), Start(std::move(Start)), End(std::move(End)), Step(std::move(Step)), Body(std::move(Body)) {}
 
 Value *ForExprAST::codegen() {
+	Function *TheFunction = Codegen::Builder->GetInsertBlock()->getParent();
+
+	//Create an alloca for the variable in the entry block
+	AllocaInst *Alloca = Codegen::CreateEntryBlockAlloca(TheFunction, VarName);
+
 	//Emit the Start code first, without 'variable' in scope.
 	Value *StartVal = Start->codegen();
 	if (!StartVal)
 		return nullptr;
 
-	//Make the new basic block for the loop header, inserting after current block
-	Function *TheFunction = Codegen::Builder->GetInsertBlock()->getParent();
-	//need to add to PHI node
-	BasicBlock *PreHeaderBB = Codegen::Builder->GetInsertBlock();
+	// Store the value into the alloca
+	Codegen::Builder->CreateStore(StartVal, Alloca);
+
+	//make the new basic block for the loop header, inserting after current block
 	BasicBlock *LoopBB = BasicBlock::Create(*Codegen::Thecontext, "loop", TheFunction);
 
 	//Insert an explicit fall through from the current block to the LoopBB
@@ -22,16 +27,10 @@ Value *ForExprAST::codegen() {
 	//Start insertion in LoopBB
 	Codegen::Builder->SetInsertPoint(LoopBB);
 
-	//Start the PHI node with an entry for Start.
-	PHINode *Variable = Codegen::Builder->CreatePHI(Type::getDoubleTy(*Codegen::Thecontext), 2, VarName.c_str());
-
-	Variable->addIncoming(StartVal, PreHeaderBB);
-
-	//Within the loop, the variable is defined equal to the PHI node. If it
+	//within the loop, the variable is defined equal to the PHI node. If it
 	//shadows an existing variable, we have to restore it, so save it now.
-	//save the variable incase a variable is already present in scope
-	Value *OldVal= Codegen::NamedValues[VarName];
-	Codegen::NamedValues[VarName] = Variable;
+	AllocaInst *OldVal = Codegen::NamedValues[VarName];
+	Codegen::NamedValues[VarName] = Alloca;
 
 	//emit the body of the loop. This, like any other expr, can change the
 	//current BB. Note that we ignore the value computed by the body,
@@ -51,20 +50,21 @@ Value *ForExprAST::codegen() {
 		StepVal = ConstantFP::get(*Codegen::Thecontext, APFloat(1.0));
 	}
 
-	//value of the loop on the next iteration
-	Value *NextVar = Codegen::Builder->CreateFAdd(Variable, StepVal, "nextvar");
-
 	//Compute the end condition
 	Value *EndCond = End->codegen();
 	if (!EndCond)
 		return nullptr;
 
+	// Reload, increment, and restore the alloca. This handles the case where
+	// the body of the loop mutates the variable
+	Value *CurVar = Codegen::Builder->CreateLoad(Alloca->getAllocatedType(), Alloca, VarName.c_str());
+	Value *NextVar = Codegen::Builder->CreateFAdd(CurVar, StepVal, "nextvar");
+	Codegen::Builder->CreateStore(NextVar, Alloca);
+
 	//Convert condition to a bool by comparing non-equal to 0.0
 	EndCond = Codegen::Builder->CreateFCmpONE(EndCond, ConstantFP::get(*Codegen::Thecontext, APFloat(0.0)), "loopcond");
 
 	//Create the after loop block and insert it
-	//remeber end of phi node block
-	BasicBlock *LoopEndBB = Codegen::Builder->GetInsertBlock();
 	BasicBlock *AfterBB = BasicBlock::Create(*Codegen::Thecontext, "afterloop", TheFunction);
 
 	//Insert the conditional branch into the end of LoopEndBB
@@ -73,9 +73,6 @@ Value *ForExprAST::codegen() {
 
 	//Now any new code will be inserted AfterBB
 	Codegen::Builder->SetInsertPoint(AfterBB);
-
-	//Add a new entry to the PHI node for the backedge
-	Variable->addIncoming(NextVar, LoopEndBB);
 
 	//restore the old shadowed value
 	if (OldVal)

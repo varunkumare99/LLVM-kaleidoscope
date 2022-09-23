@@ -35,11 +35,20 @@ namespace Codegen {
 		// return null if prototype does not exist
 		return nullptr;
 	}
+	
+	//Create an alloca instruction in the entry block of the function
+	//This is used for mutable variables.
+	AllocaInst *CreateEntryBlockAlloca(Function *TheFunction, const std::string &Varname) {
+
+		//TmpB points at the first instruction of the entry block
+		IRBuilder<> TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
+		return TmpB.CreateAlloca(Type::getDoubleTy(*Thecontext), 0, Varname.c_str());
+	}
 
 	std::unique_ptr<LLVMContext> Thecontext;
 	std::unique_ptr<IRBuilder<>> Builder;
 	std::unique_ptr<Module> TheModule;
-	std::map<std::string, Value*> NamedValues;
+	std::map<std::string, AllocaInst*> NamedValues;
 	std::unique_ptr<legacy::FunctionPassManager> TheFPM;
 	std::map<std::pair<std::string, unsigned int>, std::unique_ptr<PrototypeAST>> FunctionProtos;
 	std::map<std::pair<std::string,unsigned int>, std::string> functionOverloadNameMap;
